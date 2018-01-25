@@ -5,7 +5,7 @@ bool select_img_flag;
     
 void MouseEvent(int event, int x, int y, int flags, void* data)
 {
-    if(event == CV_EVENT_FLAG_RBUTTON)
+    if(event == CV_EVENT_LBUTTONDBLCLK)
         select_img_flag = true;
 }
 int main(int argc, char** argv)
@@ -15,6 +15,10 @@ int main(int argc, char** argv)
     cv::VideoCapture cap;
     cv::Mat img;
     cap.open(0);
+    
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 1000);
+    
     if(!cap.isOpened())
     {
         ROS_INFO("cannot open video");
@@ -33,16 +37,22 @@ int main(int argc, char** argv)
 	{
 	    ROS_INFO("cannot open video");
 	}
+// 	std::cout << "img" << img.rows << std::endl;
 	cv::namedWindow("orignal img");
-	cv::imshow("orignal img", img);
 	cv::setMouseCallback("orignal img", MouseEvent, 0);
+	cv::imshow("orignal img", img);
+	cv::waitKey(1);
+	
 	if(select_img_flag == true)
 	{
 	    if(myCalibra.success_image < myconfig.success_thres)
 	        myCalibra.processFrame(img);
-	    
+	    else
+	      ROS_INFO("all calibration steps have been finished");
 	    select_img_flag = false;
 	}
+	
+ 	//ROS_ERROR("%d", select_img_flag);
 	ros::spinOnce();
         loop_rate.sleep();
     }

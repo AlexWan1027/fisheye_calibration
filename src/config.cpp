@@ -3,9 +3,9 @@
 namespace fisheye {
 
 Config::Config():
-  board_size(),
-  square_size(),
-  success_thres()
+  board_size(8,6),
+  square_size(28, 28),
+  success_thres(5)
 {}
 
 Config::~Config()

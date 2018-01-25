@@ -6,12 +6,20 @@ FisheyeCalibration::FisheyeCalibration(cv::Size board_size_, cv::Size square_siz
   board_size(board_size_),
   square_size(square_size_),
   success_thres(success_thres_),
-  success_image(0)
+  success_image(0),
+  nameWindowName("calibration image"),
+  showImgSize(300, 300),
+  nShowImageSize(500),
+  nSplitLineSize(15),
+  nAroundLineSize(50),
+  flags(0)
 {
     object_Points.clear();
     corners.clear();
     corners_Seq.clear();
     point_counts.clear();
+    imageSet.clear();
+    createShowImgWindows(nameWindowName);
 }
 
 FisheyeCalibration::~FisheyeCalibration()
@@ -22,6 +30,7 @@ FisheyeCalibration::~FisheyeCalibration()
 void FisheyeCalibration::processFrame(const cv::Mat &img)
 {
     frame = img.clone();
+    imageSet.clear();
 
     if(frame.channels()==3)
     {
@@ -29,7 +38,8 @@ void FisheyeCalibration::processFrame(const cv::Mat &img)
     }
     
     image_size = frame.size();
-    
+    std::cout << image_size.height << std::endl;
+    imageSet.push_back(frame);
     bool patternfound = cv::findChessboardCorners(frame, board_size, corners, cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE +
             cv::CALIB_CB_FAST_CHECK);
     if (!patternfound)
@@ -49,18 +59,20 @@ void FisheyeCalibration::processFrame(const cv::Mat &img)
 	}
 	
 	success_image = success_image + 1;
-	
+	ROS_INFO("success = %d", success_image);
+	imageSet.push_back(imageTemp);
 	corners_Seq.push_back(corners);
+	mergImage(imageSet);
+	showImg(mergeImg, nameWindowName);
     }
     if(success_image == success_thres)
         getBoardPoints();
-    
-    showImg(img, frame);
     return;
 }
 
 void FisheyeCalibration::getBoardPoints()
 {
+    ROS_INFO("%d", corners_Seq.size());
     for (int t = 0; t < success_image; t++)
     {
         std::vector<cv::Point3f> tempPointSet;
@@ -70,19 +82,15 @@ void FisheyeCalibration::getBoardPoints()
             {
                 /* 假设定标板放在世界坐标系中z=0的平面上 */
                 cv::Point3f tempPoint;
-                tempPoint.x = i*square_size.width;
-                tempPoint.y = j*square_size.height;
+                tempPoint.x = i * square_size.width;
+                tempPoint.y = j * square_size.height;
                 tempPoint.z = 0;
                 tempPointSet.push_back(tempPoint);
             }
         }
         object_Points.push_back(tempPointSet);
     }
-    
-    for (int i = 0; i < success_image; i++)
-    {
-        point_counts.push_back(board_size.width*board_size.height);
-    }
+
     doCalibration();
     
     return;
@@ -95,8 +103,8 @@ void FisheyeCalibration::doCalibration()
     flags |= cv::fisheye::CALIB_CHECK_COND;
     flags |= cv::fisheye::CALIB_FIX_SKEW;
     cv::fisheye::calibrate(object_Points, corners_Seq, image_size, 
-			   intrinsic_matrix, distortion_coeffs, rotation_vectors, 
-			   translation_vectors, flags, cv::TermCriteria(3, 20, 1e-6));
+ 			   intrinsic_matrix, distortion_coeffs, rotation_vectors, 
+ 			   translation_vectors, flags, cv::TermCriteria(3, 20, 1e-6));
     ROS_INFO("calibration is ok!!!");
   
     cv::Mat rotation_matrix = cv::Mat(3, 3, CV_32FC1, cv::Scalar::all(0));
@@ -110,14 +118,50 @@ void FisheyeCalibration::doCalibration()
     return;
 }
 
-void FisheyeCalibration::showImg(const cv::Mat &img, const cv::Mat &processimg)
+inline void FisheyeCalibration::showImg(const cv::Mat &img, std::string windowName)
 {
-    cv::namedWindow("orginal img", CV_WINDOW_AUTOSIZE);
-    cv::imshow("orginal img", img);
+    cv::imshow(windowName, img);
     cv::waitKey(1);
-    
     return;
-  
+}
+
+inline void FisheyeCalibration::mergImage(const std::vector<cv::Mat> &imgs)
+{
+    int nNumImages = imgs.size();
+    cv::Size nSizeWindows = cv::Size(2, 1);
+    
+    imageHeight = nShowImageSize * nSizeWindows.width + nAroundLineSize + (nSizeWindows.width - 1) * nSplitLineSize;
+    imageWidth = nShowImageSize * nSizeWindows.height + nAroundLineSize + (nSizeWindows.height - 1) * nSplitLineSize;
+    
+    cv::Mat showWindowImages(imageWidth, imageHeight, CV_8UC1, cv::Scalar::all(0));
+    
+    posX = (showWindowImages.cols - (nShowImageSize * nSizeWindows.width + (nSizeWindows.width - 1) * nSplitLineSize)) / 2;
+    posY = (showWindowImages.rows - (nShowImageSize * nSizeWindows.height + (nSizeWindows.height - 1) * nSplitLineSize)) / 2;
+    
+    int tempPosX = posX;
+    int tempPosY = posY;
+    
+    for(int i = 0; i < nNumImages; i++)
+    {
+        if((i % nSizeWindows.width == 0) && (tempPosX != posX))
+	{
+	    tempPosX = posX;
+	    tempPosY += (nSplitLineSize + nShowImageSize);
+	}
+	cv::Mat tempImage = showWindowImages(cv::Rect(tempPosX, tempPosY, nShowImageSize, nShowImageSize));
+	
+	cv::resize(imgs[i], tempImage, cv::Size(nShowImageSize, nShowImageSize));
+	
+	tempPosX += (nSplitLineSize + nShowImageSize);
+     }
+     mergeImg = showWindowImages.clone();
+}
+
+inline void FisheyeCalibration::createShowImgWindows(std::string windowName)
+{
+    cv::namedWindow(windowName, CV_WINDOW_AUTOSIZE);
+    return;
+
 }
 
 }

@@ -5,7 +5,7 @@ add_compile_options(-std=c++11)
 
 #set(OpenCV_DIR /usr/local/share/OpenCV)
 
-find_package(OpenCV REQUIRED)
+#find_package(OpenCV REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   roscpp
