@@ -1,0 +1,9 @@
+%YAML:1.0
+---
+board_width: 8
+board_height: 6
+success_thres: 20
+square_size: 28
+initial_guess_fxfy: 363.0
+initial_guess_u: 852.0
+initial_guess_v: 553.0
