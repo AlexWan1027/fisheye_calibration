@@ -16,8 +16,10 @@ int main(int argc, char** argv)
     cv::Mat img;
     cap.open(0);
     
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 1920);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 1000);
+    cap.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+//     cap.set(cv::CAP_PROP_AUTO_EXPOSURE, 0);
+//     cap.set(cv::CAP_PROP_EXPOSURE, 50);
     
     if(!cap.isOpened())
     {
@@ -26,9 +28,10 @@ int main(int argc, char** argv)
     }
     
     select_img_flag = false;
-    
-    fisheye::Config myconfig;
-    fisheye::FisheyeCalibration myCalibra(myconfig.board_size, myconfig.square_size, myconfig.success_thres);
+    int readImgRead = 0;
+    cv::Mat frame;
+
+    fisheye::FisheyeCalibration myCalibra;
     
     ros::Rate loop_rate(50);
     while(ros::ok())
@@ -43,10 +46,18 @@ int main(int argc, char** argv)
 	cv::imshow("orignal img", img);
 	cv::waitKey(1);
 	
+	
 	if(select_img_flag == true)
 	{
-	    if(myCalibra.success_image < myconfig.success_thres)
+	    if(myCalibra.success_image < myCalibra.success_thres)
+	    {
+// 		char img_file[200];
+// 	        sprintf(img_file, "/home/alex/myfile/data/fisheye_calibration/%d.jpg", readImgRead);
+//                 readImgRead ++;
+//                 frame = cv::imread(img_file);
+	        std:: cout << myCalibra.success_thres << std::endl;
 	        myCalibra.processFrame(img);
+	    }
 	    else
 	      ROS_INFO("all calibration steps have been finished");
 	    select_img_flag = false;

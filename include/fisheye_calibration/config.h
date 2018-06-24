@@ -18,6 +18,8 @@ public:
     cv::Size square_size;  
     cv::Size board_size;
     int success_thres;
+    const char* config_file;
+    float initial_guess_fxfy, initial_guess_u, initial_guess_v;
 };
 
 } 

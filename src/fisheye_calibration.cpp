@@ -2,10 +2,7 @@
 
 namespace fisheye{
 
-FisheyeCalibration::FisheyeCalibration(cv::Size board_size_, cv::Size square_size_, int success_thres_):
-  board_size(board_size_),
-  square_size(square_size_),
-  success_thres(success_thres_),
+FisheyeCalibration::FisheyeCalibration():
   success_image(0),
   nameWindowName("calibration image"),
   showImgSize(300, 300),
@@ -19,7 +16,13 @@ FisheyeCalibration::FisheyeCalibration(cv::Size board_size_, cv::Size square_siz
     corners_Seq.clear();
     point_counts.clear();
     imageSet.clear();
+    intrinsic_K = (cv::Mat_<double>(3, 3) << myconfig.initial_guess_fxfy, 0, myconfig.initial_guess_u, 0, myconfig.initial_guess_fxfy, myconfig.initial_guess_v, 0, 0, 1);
+    distortion_coeffs = cv::Mat_<double>(4, 1);
     createShowImgWindows(nameWindowName);
+    readImgRead = 0;
+    square_size = myconfig.square_size;
+    board_size = myconfig.board_size;
+    success_thres = myconfig.success_thres;
 }
 
 FisheyeCalibration::~FisheyeCalibration()
@@ -29,7 +32,12 @@ FisheyeCalibration::~FisheyeCalibration()
 
 void FisheyeCalibration::processFrame(const cv::Mat &img)
 {
-    frame = img.clone();
+     frame = img.clone();
+//     sprintf(img_file, "/home/alex/myfile/data/fisheye_calibration/%d.jpg", readImgRead);
+//     std::cout << img_file << std::endl;
+//     frame = cv::imread(img_file);
+//     readImgRead++;
+  
     imageSet.clear();
 
     if(frame.channels()==3)
@@ -57,13 +65,23 @@ void FisheyeCalibration::processFrame(const cv::Mat &img)
 	{
 	    cv::circle(imageTemp, corners[j], 10, cv::Scalar(0, 0, 255), 2, 8, 0);
 	}
-	
+
 	success_image = success_image + 1;
+	
+	std::string imageFileName;
+        std::stringstream StrStm;
+        StrStm << success_image;
+	StrStm >> imageFileName;
+        imageFileName += "_d.jpg";
+	
+        cv::imwrite(imageFileName, img);
+	
 	ROS_INFO("success = %d", success_image);
 	imageSet.push_back(imageTemp);
 	corners_Seq.push_back(corners);
 	mergImage(imageSet);
 	showImg(mergeImg, nameWindowName);
+	
     }
     if(success_image == success_thres)
         getBoardPoints();
@@ -72,7 +90,6 @@ void FisheyeCalibration::processFrame(const cv::Mat &img)
 
 void FisheyeCalibration::getBoardPoints()
 {
-    ROS_INFO("%d", corners_Seq.size());
     for (int t = 0; t < success_image; t++)
     {
         std::vector<cv::Point3f> tempPointSet;
@@ -98,21 +115,25 @@ void FisheyeCalibration::getBoardPoints()
 
 void FisheyeCalibration::doCalibration()
 {
-    std::ofstream fout("caliberation_result.txt");
+    cv::FileStorage fs("fisheye.yml", cv::FileStorage::WRITE);
+
+//     std::ofstream fout("caliberation_result.txt");
+    if(myconfig.initial_guess_fxfy >= 0)
+    {
+	K = intrinsic_K;
+	flags |= cv::fisheye::CALIB_USE_INTRINSIC_GUESS;
+    }
     flags |= cv::fisheye::CALIB_RECOMPUTE_EXTRINSIC;
     flags |= cv::fisheye::CALIB_CHECK_COND;
     flags |= cv::fisheye::CALIB_FIX_SKEW;
     cv::fisheye::calibrate(object_Points, corners_Seq, image_size, 
- 			   intrinsic_matrix, distortion_coeffs, rotation_vectors, 
+ 			   K, distortion_coeffs, rotation_vectors, 
  			   translation_vectors, flags, cv::TermCriteria(3, 20, 1e-6));
     ROS_INFO("calibration is ok!!!");
   
-    cv::Mat rotation_matrix = cv::Mat(3, 3, CV_32FC1, cv::Scalar::all(0));
-    fout << "相机内参数矩阵：" << std::endl;
-    fout << intrinsic_matrix << std::endl;
-    fout << "畸变系数：\n";
-    fout << distortion_coeffs << std::endl;
-    fout << std::endl;
+    fs << "cameraMatrix" << K << "distCoeffs" << distortion_coeffs;  
+    fs.release();
+    
     ROS_INFO("calibration's result is saved!!!");
     
     return;
